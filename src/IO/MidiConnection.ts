@@ -1,5 +1,6 @@
 import { UserAPI } from "../API";
 import { AppSettings } from "../FileManagement";
+import { time } from "../documentation/learning/time/time";
 
 export type MidiNoteEvent = {
   note: number;
@@ -111,26 +112,26 @@ export class MidiConnection {
     }
   }
 
-  public sendStartMessage(): void {
+  public sendStartMessage(timestamp: number): void {
     /**
      * Sends a MIDI Start message to the currently selected MIDI output and MIDI clock is not used
      */
     if (!this.midiClockInput) {
       const output = this.midiOutputs[this.currentOutputIndex];
       if (output) {
-        output.send([0xfa]); // Send MIDI Start message
+        output.send([0xfa], timestamp); // Send MIDI Start message
       }
     }
   }
 
-  public sendStopMessage(): void {
+  public sendStopMessage(timestamp: number): void {
     /**
      * Sends a MIDI Stop message to the currently selected MIDI output and MIDI clock is not used
      */
     if (!this.midiClockInput) {
       const output = this.midiOutputs[this.currentOutputIndex];
       if (output) {
-        output.send([0xfc]); // Send MIDI Stop message
+        output.send([0xfc], timestamp); // Send MIDI Stop message
       }
     }
   }
@@ -539,14 +540,14 @@ export class MidiConnection {
     return Math.round(sum / this.clockBuffer.length);
   }
 
-  public sendMidiClock(): void {
+  public sendMidiClock(timestamp: number): void {
     /**
      * Sends a single MIDI clock message to the currently selected MIDI output.
      */
     if (!this.midiClockInput) {
       const output = this.midiOutputs[this.currentOutputIndex];
       if (output) {
-        output.send([0xf8]); // Send a single MIDI clock message
+        output.send([0xf8], timestamp); // Send a single MIDI clock message
       }
     }
   }
@@ -645,6 +646,7 @@ export class MidiConnection {
     duration: number,
     port: number | string = this.currentOutputIndex,
     bend: number | undefined = undefined,
+    timestamp: number
   ): void {
     /**
      * Sending a MIDI Note on/off message with the same note number and channel. Automatically manages
@@ -665,15 +667,15 @@ export class MidiConnection {
       const noteOffMessage = [0x80 + channel, noteNumber, 0];
 
       // Send Note On
-      output.send(noteOnMessage);
+      output.send(noteOnMessage, timestamp);
 
-      if (bend) this.sendPitchBend(bend, channel, port);
+      if (bend) this.sendPitchBend(bend, channel, port, timestamp);
 
       // Schedule Note Off
       const timeoutId = setTimeout(
         () => {
-          output.send(noteOffMessage);
-          if (bend) this.sendPitchBend(8192, channel, port);
+          output.send(noteOffMessage, timestamp + duration - 0.02);
+          if (bend) this.sendPitchBend(8192, channel, port, timestamp + duration - 0.02);
           delete this.scheduledNotes[noteNumber];
         },
         (duration - 0.02) * 1000,
@@ -691,6 +693,7 @@ export class MidiConnection {
     channel: number,
     velocity: number,
     port: number | string = this.currentOutputIndex,
+    timestamp: number,
   ) {
     /**
      * Sending Midi Note on message
@@ -700,7 +703,7 @@ export class MidiConnection {
     note = Math.min(Math.max(note, 0), 127);
     if (output) {
       const noteOnMessage = [0x90 + channel, note, velocity];
-      output.send(noteOnMessage);
+      output.send(noteOnMessage, timestamp);
     } else {
       console.error("MIDI output not available.");
     }
@@ -710,6 +713,7 @@ export class MidiConnection {
     note: number,
     channel: number,
     port: number | string = this.currentOutputIndex,
+    timestamp: number
   ) {
     /**
      * Sending Midi Note off message
@@ -719,7 +723,7 @@ export class MidiConnection {
     note = Math.min(Math.max(note, 0), 127);
     if (output) {
       const noteOffMessage = [0x80 + channel, note, 0];
-      output.send(noteOffMessage);
+      output.send(noteOffMessage, timestamp);
     } else {
       console.error("MIDI output not available.");
     }
@@ -728,6 +732,7 @@ export class MidiConnection {
   sendAllNotesOff(
     channel: number,
     port: number | string = this.currentOutputIndex,
+    timestamp: number
   ) {
     /**
      * Sending Midi Note off message
@@ -736,7 +741,7 @@ export class MidiConnection {
     const output = this.midiOutputs[port];
     if (output) {
       const noteOffMessage = [0xb0 + channel, 123, 0];
-      output.send(noteOffMessage);
+      output.send(noteOffMessage, timestamp);
     } else {
       console.error("MIDI output not available.");
     }
@@ -745,6 +750,7 @@ export class MidiConnection {
   sendAllSoundOff(
     channel: number,
     port: number | string = this.currentOutputIndex,
+    timestamp: number
   ) {
     /**
      * Sending all sound off
@@ -753,13 +759,13 @@ export class MidiConnection {
     const output = this.midiOutputs[port];
     if (output) {
       const noteOffMessage = [0xb0 + channel, 120, 0];
-      output.send(noteOffMessage);
+      output.send(noteOffMessage, timestamp);
     } else {
       console.error("MIDI output not available.");
     }
   }
 
-  public sendSysExMessage(message: number[]): void {
+  public sendSysExMessage(message: number[], timestamp: number): void {
     /**
      * Sends a SysEx message to the currently selected MIDI output.
      *
@@ -771,7 +777,7 @@ export class MidiConnection {
      */
     const output = this.midiOutputs[this.currentOutputIndex];
     if (output) {
-      output.send(message);
+      output.send(message, timestamp);
     } else {
       console.error("MIDI output not available.");
     }
@@ -781,6 +787,7 @@ export class MidiConnection {
     value: number,
     channel: number,
     port: number | string = this.currentOutputIndex,
+    timestamp: number,
   ): void {
     /**
      * Sends a MIDI Pitch Bend message to the currently selected MIDI output.
@@ -802,13 +809,13 @@ export class MidiConnection {
     if (output) {
       const lsb = value & 0x7f;
       const msb = (value >> 7) & 0x7f;
-      output.send([0xe0 | channel, lsb, msb]);
+      output.send([0xe0 | channel, lsb, msb], timestamp);
     } else {
       console.error("MIDI output not available.");
     }
   }
 
-  public sendProgramChange(programNumber: number, channel: number): void {
+  public sendProgramChange(programNumber: number, channel: number, timestamp: number): void {
     /**
      * Sends a MIDI Program Change message to the currently selected MIDI output.
      *
@@ -821,7 +828,7 @@ export class MidiConnection {
      */
     const output = this.midiOutputs[this.currentOutputIndex];
     if (output) {
-      output.send([0xc0 + channel, programNumber]); // Program Change
+      output.send([0xc0 + channel, programNumber], timestamp); // Program Change
     } else {
       console.error("MIDI output not available.");
     }
@@ -831,6 +838,7 @@ export class MidiConnection {
     controlNumber: number,
     value: number,
     channel: number,
+    timestamp: number,
   ): void {
     /**
      * Sends a MIDI Control Change message to the currently selected MIDI output.
@@ -841,13 +849,13 @@ export class MidiConnection {
      */
     const output = this.midiOutputs[this.currentOutputIndex];
     if (output) {
-      output.send([0xb0 + channel, controlNumber, value]); // Control Change
+      output.send([0xb0 + channel, controlNumber, value], timestamp); // Control Change
     } else {
       console.error("MIDI output not available.");
     }
   }
 
-  public panic(): void {
+  public panic(timestamp: number): void {
     /**
      * Sends a Note Off message for all scheduled notes.
      */
@@ -856,7 +864,7 @@ export class MidiConnection {
       for (const noteNumber in this.scheduledNotes) {
         const timeoutId = this.scheduledNotes[noteNumber];
         clearTimeout(timeoutId);
-        output.send([0x80, parseInt(noteNumber), 0]); // Note Off
+        output.send([0x80, parseInt(noteNumber), 0], timestamp); // Note Off
       }
       this.scheduledNotes = {};
     } else {
