@@ -1,5 +1,6 @@
 import { UserAPI } from "../API";
 import { AppSettings } from "../FileManagement";
+import { type Editor } from "../main";
 
 export type MidiNoteEvent = {
   note: number;
@@ -28,6 +29,7 @@ export class MidiConnection {
 
   /* Midi output */
   private api: UserAPI;
+  public app: Editor;
   private settings: AppSettings;
   private midiAccess: MIDIAccess | null = null;
   public midiOutputs: MIDIOutput[] = [];
@@ -61,9 +63,10 @@ export class MidiConnection {
   private clockErrorCount = 0;
   private skipOnError = 0;
 
-  constructor(api: UserAPI, settings: AppSettings) {
+  constructor(api: UserAPI, app: Editor) {
     this.api = api;
-    this.settings = settings;
+    this.app = app;
+    this.settings = this.app.settings;
     this.lastBPM = api.tempo();
     this.roundedBPM = this.lastBPM;
     this.initializeMidiAccess();
@@ -664,24 +667,19 @@ export class MidiConnection {
     if (output) {
       const noteOnMessage = [0x90 + channel, noteNumber, velocity];
       const noteOffMessage = [0x80 + channel, noteNumber, 0];
+      let note_duration = (duration - 0.02) * 10000;
+      let currentTime = this.app.audioContext.currentTime;
+      let note_begin_timestamp = currentTime - timestamp;
+      let note_end_timestamp = note_begin_timestamp + note_duration;
+      console.log(note_begin_timestamp, note_end_timestamp)
 
       // Send Note On
-      output.send(noteOnMessage, timestamp);
+      output.send(noteOnMessage, note_begin_timestamp);
+      if (bend) this.sendPitchBend(bend, channel, port, note_begin_timestamp);
 
-      if (bend) this.sendPitchBend(bend, channel, port, timestamp);
-
-      // Schedule Note Off
-      const timeoutId = setTimeout(
-        () => {
-          output.send(noteOffMessage, timestamp + duration - 0.02);
-          if (bend) this.sendPitchBend(8192, channel, port, timestamp + duration - 0.02);
-          delete this.scheduledNotes[noteNumber];
-        },
-        (duration - 0.02) * 1000,
-      );
-
-      // @ts-ignore
-      this.scheduledNotes[noteNumber] = timeoutId;
+      // Send Note Off
+      output.send(noteOffMessage, note_end_timestamp);
+      if (bend) this.sendPitchBend(8192, channel, port, note_end_timestamp);
     } else {
       console.error("MIDI output not available.");
     }

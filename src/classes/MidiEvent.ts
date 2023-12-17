@@ -28,6 +28,7 @@ export class MidiEvent extends AudibleEvent {
     super(app);
     this.values = input;
     this.midiConnection = app.api.MidiConnection;
+    this.app = app
   }
 
   sustain = (value: number | number[]): this => {
@@ -115,7 +116,7 @@ export class MidiEvent extends AudibleEvent {
     return this;
   };
 
-  out = (): void => {
+  public out = (): void => {
     function play(event: MidiEvent, params: MidiParams): void {
       const channel = params.channel ? params.channel : 0;
       const velocity = params.velocity ? params.velocity : 100;
@@ -130,14 +131,14 @@ export class MidiEvent extends AudibleEvent {
       const port = params.port
         ? event.midiConnection.getMidiOutputIndex(params.port)
         : event.midiConnection.getCurrentMidiPortIndex() || 0;
-
-      event.midiConnection.sendMidiNote(
+        event.midiConnection.sendMidiNote(
         note,
         channel,
         velocity,
         sustain,
         port,
         bend,
+        event.app.clock.deadline,
       );
     }
 

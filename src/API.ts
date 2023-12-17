@@ -99,7 +99,7 @@ export class UserAPI {
   load: samples;
 
   constructor(public app: Editor) {
-    this.MidiConnection = new MidiConnection(this, app.settings);
+    this.MidiConnection = new MidiConnection(this, app);
   }
 
   _loadUniverseFromInterface = (universe: string) => {
@@ -243,7 +243,7 @@ export class UserAPI {
 
   public play = (): void => {
     this.app.setButtonHighlighting("play", true);
-    this.MidiConnection.sendStartMessage();
+    this.MidiConnection.sendStartMessage(this.app.clock.deadline * 1000);
     this.app.clock.start();
   };
 
@@ -455,10 +455,10 @@ export class UserAPI {
      *
      * @param data - The sysex data to send
      */
-    this.MidiConnection.sendSysExMessage(data);
+    this.MidiConnection.sendSysExMessage(data, this.app.clock.deadline * 1000);
   };
 
-  public pitch_bend = (value: number, channel: number): void => {
+  public pitch_bend = (value: number, channel: number, port: string): void => {
     /**
      * Sends a MIDI pitch bend to the current MIDI output.
      *
@@ -467,7 +467,7 @@ export class UserAPI {
      *
      * @returns The value of the pitch bend
      */
-    this.MidiConnection.sendPitchBend(value, channel);
+    this.MidiConnection.sendPitchBend(value, channel, port, this.app.clock.deadline * 1000);
   };
 
   public program_change = (program: number, channel: number): void => {
@@ -477,14 +477,14 @@ export class UserAPI {
      * @param program - The MIDI program to send
      * @param channel - The MIDI channel to send the program change on
      */
-    this.MidiConnection.sendProgramChange(program, channel);
+    this.MidiConnection.sendProgramChange(program, channel, this.app.clock.deadline * 1000);
   };
 
   public midi_clock = (): void => {
     /**
      * Sends a MIDI clock to the current MIDI output.
      */
-    this.MidiConnection.sendMidiClock();
+    this.MidiConnection.sendMidiClock(this.app.clock.deadline * 1000);
   };
 
   public control_change = ({
@@ -498,14 +498,14 @@ export class UserAPI {
      * @param control - The MIDI control to send
      * @param value - The value of the control
      */
-    this.MidiConnection.sendMidiControlChange(control, value, channel);
+    this.MidiConnection.sendMidiControlChange(control, value, channel, this.app.clock.deadline * 1000);
   };
 
   public midi_panic = (): void => {
     /**
      * Sends a MIDI panic message to the current MIDI output.
      */
-    this.MidiConnection.panic();
+    this.MidiConnection.panic(this.app.clock.deadline * 1000);
   };
 
   public active_note_events = (
@@ -656,8 +656,8 @@ export class UserAPI {
       const scaleNotes = getAllScaleNotes(scale, root);
       // Send each scale note to current midi out
       scaleNotes.forEach((note) => {
-        this.MidiConnection.sendMidiOn(note, channel, 1, port);
-        if (soundOff) this.MidiConnection.sendAllSoundOff(channel, port);
+        this.MidiConnection.sendMidiOn(note, channel, 1, port, this.app.clock.deadline * 1000);
+        if (soundOff) this.MidiConnection.sendAllSoundOff(channel, port, this.app.clock.deadline * 1000);
       });
 
       this.scale_aid = scale;
@@ -678,7 +678,7 @@ export class UserAPI {
     const allNotes = Array.from(Array(128).keys());
     // Send each scale note to current midi out
     allNotes.forEach((note) => {
-      this.MidiConnection.sendMidiOff(note, channel, port);
+      this.MidiConnection.sendMidiOff(note, channel, port, this.app.clock.deadline * 1000);
     });
     this.scale_aid = undefined;
   };
@@ -690,7 +690,7 @@ export class UserAPI {
     /**
      * Sends all notes off to midi output
      */
-    this.MidiConnection.sendAllNotesOff(channel, port);
+    this.MidiConnection.sendAllNotesOff(channel, port, this.app.clock.deadline * 1000);
   };
 
   midi_sound_off = (
@@ -700,7 +700,7 @@ export class UserAPI {
     /**
      * Sends all sound off to midi output
      */
-    this.MidiConnection.sendAllSoundOff(channel, port);
+    this.MidiConnection.sendAllSoundOff(channel, port, this.app.clock.deadline * 1000);
   };
 
   // =============================================================

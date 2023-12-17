@@ -81,7 +81,8 @@ export class Clock {
     this.tick = tick;
     if (this.app.clock.running) {
       if (this.app.settings.send_clock) {
-        this.app.api.MidiConnection.sendMidiClock();
+        let timestamp = time - getAudioContext().currentTime;
+        this.app.api.MidiConnection.sendMidiClock(timestamp);
       }
       const futureTimeStamp = this.app.clock.convertTicksToTimeposition(
         this.app.clock.tick,
@@ -248,7 +249,7 @@ export class Clock {
      */
     this.app.audioContext.resume();
     this.running = true;
-    this.app.api.MidiConnection.sendStartMessage();
+    this.app.api.MidiConnection.sendStartMessage(this.deadline - getAudioContext().currentTime);
     this.clock.start();
   }
 
@@ -259,7 +260,7 @@ export class Clock {
      * @remark also sends a MIDI message if a port is declared
      */
     this.running = false;
-    this.app.api.MidiConnection.sendStopMessage();
+    this.app.api.MidiConnection.sendStopMessage(this.deadline - getAudioContext().currentTime);
     this.clock.pause();
   }
 
@@ -272,7 +273,7 @@ export class Clock {
     this.running = false;
     this.tick = 0;
     this.time_position = { bar: 0, beat: 0, pulse: 0 };
-    this.app.api.MidiConnection.sendStopMessage();
+    this.app.api.MidiConnection.sendStopMessage(this.deadline - getAudioContext());
     this.clock.stop();
   }
 }
